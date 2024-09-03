@@ -352,6 +352,11 @@ const preLost = () => {
     }
   });
 
+  document.addEventListener('click', function handler(event) {
+    document.removeEventListener('click', handler);
+    reset();
+  });
+
   state = lost;
 };
 
