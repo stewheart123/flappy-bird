@@ -18,6 +18,7 @@ let id;
 let state;
 let gameTime;
 let isDay;
+let nextState;
 
 // Sprites
 let background;
@@ -26,6 +27,10 @@ let bird;
 let floor;
 let gameOver;
 let pipes;
+
+let uiBackground = undefined;
+let isSetup = false;
+let doDestroy = false;
 
 const birdAnimationStates = [
   'yellow-bird-1.png',
@@ -81,6 +86,12 @@ class Throttler {
   }
 }
 
+
+const setMode = () => {
+  doDestroy = true;
+};
+
+
 // Throttlers
 const birdThrottler = new Throttler();
 
@@ -101,6 +112,7 @@ const flySpaceHandler = (event) => {
     flyClickHandler();
   }
 };
+
 
 const generatePipeContainer = (center) => {
   const pipeContainer = new Container();
@@ -240,7 +252,7 @@ const checkCollisions = () => {
       const downPipe = pipe.children[1];
 
       if (birdTopY < downPipe.getGlobalPosition().y - currentGapSize - 5
-          || birdBottomY > upPipe.getGlobalPosition().y + upPipe.height + currentGapSize + 5) {
+        || birdBottomY > upPipe.getGlobalPosition().y + upPipe.height + currentGapSize + 5) {
         collided = true;
       }
     }
@@ -293,7 +305,7 @@ const play = () => {
 
   // Make gaps smaller
   if (currentGapSize > 48) {
-      currentGapSize -= 0.01
+    currentGapSize -= 0.01
   }
   // Make pipes closer together
   if (PIPE_SEPARATION > renderer.width * 0.35) {
@@ -326,11 +338,11 @@ const play = () => {
 };
 
 const lost = () => {
-    // Animate the bird
-    animateBirdPlay();
+  // Animate the bird
+  animateBirdPlay();
 
-    // Prevent phasing through floor
-    checkCollisions();
+  // Prevent phasing through floor
+  checkCollisions();
 };
 
 const preLost = () => {
@@ -344,16 +356,22 @@ const preLost = () => {
   gameOver.x = (renderer.width / 4) - (gameOver.width / 2);
   gameOver.y = (renderer.height / 4) - 60;
   stage.addChild(gameOver);
+  nextState = modeSelect;
 
-  document.addEventListener('keypress', function handler(event) {
-    if (event.which === 32) {
-      document.removeEventListener('keypress', handler);
-      reset();
-    }
-  });
+  // TODO FIX BUG OF SPACE OR CLICK RESTARTING ACCIDENTALLY. ONLY WORKS WITH ONE
+  // document.addEventListener('keypress', function handler(event) {
+  //   if (event.which === 32) {
+  //     document.removeEventListener('keypress', handler);
+  //     renderer.view.removeEventListener('click', handler);
+  //     document.removeEventListener('click', handler);
+  //     reset();
+  //   }
+  // });
 
-  document.addEventListener('click', function handler(event) {
+  document.addEventListener('click', function handler() {
+    renderer.view.removeEventListener('click', handler);
     document.removeEventListener('click', handler);
+    document.removeEventListener('keypress', handler);
     reset();
   });
 
@@ -369,11 +387,13 @@ const prePlaySetup = () => {
   renderer.view.addEventListener('click', function starter() {
     state = play;
     renderer.view.removeEventListener('click', starter);
+    document.removeEventListener('keypress', starter);
   });
   document.addEventListener('keypress', function starter() {
     if (event.keyCode === 32) {
       state = play;
       document.removeEventListener('keypress', starter);
+      renderer.view.removeEventListener('click', starter);
     }
   });
 
@@ -381,11 +401,13 @@ const prePlaySetup = () => {
   renderer.view.addEventListener('click', flyClickHandler);
   document.addEventListener('keypress', flySpaceHandler);
 
-  state = prePlay;
+  // state = prePlay;
+  //state = modeSelect;
 };
 
 // Ensures pixels are scaled up
 // PIXI.SCALE_MODES.DEFAULT = PIXI.SCALE_MODES.NEAREST;
+
 
 const reset = () => {
   stage.removeChildren();
@@ -395,6 +417,8 @@ const reset = () => {
 };
 
 const init = () => {
+  var devicePixelRatio = window.devicePixelRatio;
+
   gameTime = 0;
   isDay = true;
   birdAnimationStatesIterator.animationState = -1;
@@ -444,9 +468,95 @@ const init = () => {
   scoreContainer.addChild(zeroNum);
   stage.addChild(scoreContainer);
 
-  state = prePlaySetup;
-
+  //state = prePlaySetup;
+  if (nextState === undefined) {
+    state = modeSelect;
+  } else {
+    state = nextState;
+  }
   gameLoop();
+};
+
+/**
+ * MODE SELECT
+ * HAS BUTTONS FOR PRACTICE AND COMPETE MODES.. if wallet is connected!
+ * 
+ */
+const modeSelect = () => {
+
+  if (isSetup === false) {
+    renderer.view.removeEventListener('click', flyClickHandler);
+
+    var buttonContainer = new Container();
+    var uiPopup = new Container();
+
+    uiBackground = new PIXI.Graphics();
+    uiBackground.beginFill(0x000000, 0.7);
+    uiBackground.drawRect(0, 0, 144, 256);
+    uiBackground.endFill();
+
+    var buttonAText = new PIXI.Text('practice mode', {
+      fontFamily: 'teko',
+      fontSize: 16,
+      fill: 0xffffff,
+      align: 'center'
+    });
+
+    var buttonBText = new PIXI.Text('compete', {
+      fontFamily: 'teko',
+      fontSize: 16,
+      fill: 0xffffff,
+      align: 'center'
+    });
+
+    // Create a button graphic
+    var buttonA = new PIXI.Graphics();
+    buttonA.beginFill(0x66F3AF);
+    buttonA.drawRect(0, 0, 120, 20);
+    buttonA.endFill();
+
+    var buttonB = new PIXI.Graphics();
+    buttonB.beginFill(0x66F3AF);
+    buttonB.drawRect(0, 0, 120, 20);
+    buttonB.endFill();
+
+    buttonB.y = 30;
+    // Center the text on the button
+    buttonBText.anchor.x = 0.5;
+    buttonAText.anchor.x = 0.5;
+    buttonAText.anchor.y = 0.5;
+    buttonBText.anchor.y = 0.5;
+    buttonAText.x = 120 / 2;
+    buttonBText.x = 120 / 2;
+    buttonAText.y = 10
+    buttonBText.y = 10
+    buttonContainer.y = 60;
+    buttonContainer.x = (144 - 120) / 2;
+    buttonA.on('pointerup', setMode);
+
+    // Add interactive functionality
+    buttonA.interactive = true;
+    buttonA.buttonMode = true;
+
+    buttonB.interactive = false;
+    buttonB.buttonMode = true;
+
+    uiPopup.addChild(uiBackground);
+    uiPopup.addChild(buttonContainer);
+    buttonContainer.addChild(buttonA);
+    buttonContainer.addChild(buttonB);
+    buttonA.addChild(buttonAText);
+    buttonB.addChild(buttonBText);
+    stage.addChild(uiPopup);
+    isSetup = true;
+  }
+
+  if (doDestroy) {
+    isSetup = false;
+    doDestroy = false;
+    nextState = prePlaySetup;
+    reset();
+  }
 };
 
 document.body.appendChild(renderer.view);
